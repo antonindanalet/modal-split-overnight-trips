@@ -1,4 +1,4 @@
-# modal-split-overnight-trips
+# Mode shares of Swiss residents travelling abroad
 
 This python script computes the mode shares of Swiss residents when they travel abroad with overnights:
 - For the whole Swiss resident population and all destinations
