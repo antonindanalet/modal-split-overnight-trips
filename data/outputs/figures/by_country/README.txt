@@ -1,0 +1,1 @@
+The code will generate one PNG file by country here, with the name [country_name_in_German].png.
