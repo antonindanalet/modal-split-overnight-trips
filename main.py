@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import geopandas
+import unicodedata
+import re
 from utils_mtmc.get_mtmc_files import *
 from mtmc2015.utils2015.compute_confidence_interval import get_weighted_avg_and_std
 from mtmc2015.utils2015.codes import code2country
@@ -132,13 +134,14 @@ def run():
                                                              'total_distance_by_autocar_extrapolated',
                                                              'total_distance_by_other_extrapolated']],
                                   on='HHNR', how='left')
-    dict_column_weighted_avg_and_std, sample = get_weighted_avg_and_std(df_overnight_trips,
-                                                                        weights='WP_corrected', percentage=True,
-                                                                        list_of_columns=['total_distance_by_plane_extrapolated',
-                                                                                         'total_distance_by_pt_extrapolated',
-                                                                                         'total_distance_by_car_extrapolated',
-                                                                                         'total_distance_by_autocar_extrapolated',
-                                                                                         'total_distance_by_other_extrapolated'])
+    dict_column_weighted_avg_and_std, \
+        sample = get_weighted_avg_and_std(df_overnight_trips,
+                                          weights='WP_corrected', percentage=True,
+                                          list_of_columns=['total_distance_by_plane_extrapolated',
+                                                           'total_distance_by_pt_extrapolated',
+                                                           'total_distance_by_car_extrapolated',
+                                                           'total_distance_by_autocar_extrapolated',
+                                                           'total_distance_by_other_extrapolated'])
     print(dict_column_weighted_avg_and_std)
     # {'total_distance_by_plane_extrapolated': [6392.478257075662, 287.2957478297803],     5924.3606645
     #  'total_distance_by_pt_extrapolated': [328.1650071027181, 36.031431845065406],       260.04529228
@@ -151,20 +154,20 @@ def run():
     #  'total_distance_by_autocar_extrapolated': [0.01120895348234876, 0.002363076810386391],    1 OK
     #  'total_distance_by_other_extrapolated': [0.006834404052895455, 0.0018492865080878213]}    1 NOT OK
 
-
-
-    # get_modalsplit_by_country(df_overnight_trips)
-    # get_modalsplit_by_nuts(df_overnight_trips)
+    get_modalsplit_by_country(df_overnight_trips)
+    get_modalsplit_by_nuts(df_overnight_trips)
 
 
 def get_modalsplit_by_nuts(df_overnight_trips):
-    # Removing places where NUTS are not defined
+    # Removing places where NUTS are not defined or not relevant
     df_overnight_trips = df_overnight_trips[(df_overnight_trips['destination_country'] < 8300) &  # Keep only European
                                             (df_overnight_trips['destination_country'] != 8264) &  # Not  Russia
                                             (df_overnight_trips['destination_country'] != 8265) &  # Not Ukraine
                                             (df_overnight_trips['destination_country'] != 8252) &  # Not Bosnia
-                                            (df_overnight_trips['destination_country'] != 8256)]  # Not Kosovo
-
+                                            (df_overnight_trips['destination_country'] != 8256) &  # Not Kosovo
+                                            (df_overnight_trips['destination_country'] != 8100)]
+    # Removing places where the quality of the coordinates of the destination are bad (i.e., country level only)
+    df_overnight_trips = df_overnight_trips[df_overnight_trips['quality_dest_coord'].isin([3, 4])]
     list_modes = ['motorisierter Individualverkehr', 'öffentlicher Verkehr', 'Reisecar', 'Flugzeug', 'übrige']
     list_columns = ['Land']
     for mode in list_modes:
@@ -177,7 +180,6 @@ def get_modalsplit_by_nuts(df_overnight_trips):
                                                  geometry=geopandas.points_from_xy(df_overnight_trips.dest_x_coord,
                                                                                    df_overnight_trips.dest_y_coord),
                                                  crs='epsg:4326')
-    # gdf_overnight_trips.to_crs(epsg=6258, inplace=True)
     # Read the shape file containing the NUTS data
     NUTS_folder_path = Path('data/inputs/NUTS_RG_01M_2021_3035.shp/')
     df_NUTS = geopandas.read_file(NUTS_folder_path / 'NUTS_RG_01M_2021_3035.shp')
@@ -189,74 +191,132 @@ def get_modalsplit_by_nuts(df_overnight_trips):
     # Manuel corrections
     gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 143631) & (gdf_overnight_trips['NAME_LATN'].isna()),
                             'NAME_LATN'] = 'Este'
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 152791) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = "Provence-Alpes-Côte d’Azur"  # Monaco
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 155056) | (gdf_overnight_trips['HHNR'] == 244225) |
+                             (gdf_overnight_trips['HHNR'] == 270084) | (gdf_overnight_trips['HHNR'] == 288473) |
+                             (gdf_overnight_trips['HHNR'] == 305761) | (gdf_overnight_trips['HHNR'] == 313206) |
+                             (gdf_overnight_trips['HHNR'] == 319623) | (gdf_overnight_trips['HHNR'] == 333400) |
+                             (gdf_overnight_trips['HHNR'] == 356805) | (gdf_overnight_trips['HHNR'] == 358702) |
+                             (gdf_overnight_trips['HHNR'] == 393455) | (gdf_overnight_trips['HHNR'] == 395357) |
+                             (gdf_overnight_trips['HHNR'] == 402588) | (gdf_overnight_trips['HHNR'] == 415120) |
+                             (gdf_overnight_trips['HHNR'] == 415548) | (gdf_overnight_trips['HHNR'] == 451879) |
+                             (gdf_overnight_trips['HHNR'] == 458488) | (gdf_overnight_trips['HHNR'] == 482734) |
+                             (gdf_overnight_trips['HHNR'] == 483636) | (gdf_overnight_trips['HHNR'] == 484244) |
+                             (gdf_overnight_trips['HHNR'] == 496601) | (gdf_overnight_trips['HHNR'] == 331263)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = "Akdeniz"  # Antalya, 31.38852 36.76672
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 210400) | (gdf_overnight_trips['HHNR'] == 222129) |
+                             (gdf_overnight_trips['HHNR'] == 239507) | (gdf_overnight_trips['HHNR'] == 266268) |
+                             (gdf_overnight_trips['HHNR'] == 279298) | (gdf_overnight_trips['HHNR'] == 302999) |
+                             (gdf_overnight_trips['HHNR'] == 362051) | (gdf_overnight_trips['HHNR'] == 343824) |
+                             (gdf_overnight_trips['HHNR'] == 322389) | (gdf_overnight_trips['HHNR'] == 390773) |
+                             (gdf_overnight_trips['HHNR'] == 392617) | (gdf_overnight_trips['HHNR'] == 413971) |
+                             (gdf_overnight_trips['HHNR'] == 445200) | (gdf_overnight_trips['HHNR'] == 319731)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Kýpros'  # 34.00183 34.98213
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 217997) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Södra Sverige'
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 228851) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Região Autónoma dos Açores'
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 246703) | (gdf_overnight_trips['HHNR'] == 258329) |
+                             (gdf_overnight_trips['HHNR'] == 267142) | (gdf_overnight_trips['HHNR'] == 303078) |
+                             (gdf_overnight_trips['HHNR'] == 339084) | (gdf_overnight_trips['HHNR'] == 380182) |
+                             (gdf_overnight_trips['HHNR'] == 421540) | (gdf_overnight_trips['HHNR'] == 441755)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = "Provence-Alpes-Côte d’Azur"  # Monaco, 7.43701 43.74965
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 283584) | (gdf_overnight_trips['HHNR'] == 324292) |
+                             (gdf_overnight_trips['HHNR'] == 395375)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Norge'
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 293599) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Ireland'  # In Irish waters...
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 306501) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Bretagne'
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 327375) | (gdf_overnight_trips['HHNR'] == 415131)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Hrvatska'  # 14.76083 44.75694
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 339290) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Nord - Est'
+    gdf_overnight_trips.loc[((gdf_overnight_trips['HHNR'] == 356156) | (gdf_overnight_trips['HHNR'] == 443830)) &
+                            (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Schleswig - Holstein'  # SPO
+    gdf_overnight_trips.loc[(gdf_overnight_trips['HHNR'] == 388734) & (gdf_overnight_trips['NAME_LATN'].isna()),
+                            'NAME_LATN'] = 'Manner - Suomi'
 
-    r = gdf_overnight_trips.loc[gdf_overnight_trips['NAME_LATN'].isna()]
+    gdf_overnight_trips.drop(gdf_overnight_trips[(gdf_overnight_trips['HHNR'] == 283064) &
+                                                 (gdf_overnight_trips['NAME_LATN'].isna())].index,
+                             inplace=True)  # South Atlantic ocean, middle of nowhere
 
-    print(r['destination_country'].unique())
-    print(r)
-    # df_zp_with_work_coord['KLASSE'].fillna('5', inplace=True)
-    # df_zp.loc[df_zp.A_X != -999, 'KLASSE'] = df_zp_with_work_coord['KLASSE']
-    # df_zp['KLASSE'].fillna(-999, inplace=True)
-    # # Rename the column with the public transport connection quality
-    # df_zp.rename(columns={'KLASSE': 'public_transport_connection_quality_ARE_work'}, inplace=True)
-    #
-    # for NUTS1 in :
-    #     df_country = df_overnight_trips.loc[df_overnight_trips['destination_country_name'] == country, :]
-    #     dict_column_weighted_avg_and_std, sample = get_weighted_avg_and_std(df_country,
-    #                                                                         weights='WP', percentage=True,
-    #                                                                         list_of_columns=['trip_distance_by_plane',
-    #                                                                                          'trip_distance_by_pt',
-    #                                                                                          'trip_distance_by_car',
-    #                                                                                          'trip_distance_by_autocar',
-    #                                                                                          'trip_distance_by_other'])
-    #
-    #     df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['trip_distance_by_car'][0] * 100,
-    #                                    dict_column_weighted_avg_and_std['trip_distance_by_pt'][0] * 100,
-    #                                    dict_column_weighted_avg_and_std['trip_distance_by_autocar'][0] * 100,
-    #                                    dict_column_weighted_avg_and_std['trip_distance_by_plane'][0] * 100,
-    #                                    dict_column_weighted_avg_and_std['trip_distance_by_other'][0] * 100]],
-    #                                  columns=[list_modes])
-    #     fig, ax = plt.subplots(figsize=(10, 4))
-    #     df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
-    #                                                              '#E33B3B',  # by PT
-    #                                                              'g',  # Autocar
-    #                                                              'y',
-    #                                                              '0.8'])
-    #     sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
-    #     ax.set_yticks([])
-    #     n = 0
-    #     if len(ax.patches) == 5:
-    #         for p in ax.patches:
-    #             h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
-    #             text = f'{w:0.0f}%'
-    #             if n == 4:
-    #                 text_color = 'black'
-    #             else:
-    #                 text_color = 'white'
-    #             ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
-    #             n = n + 1
-    #     plt.xlim([0, 100])
-    #     plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + country)
-    #     basis = str(len(df_country))
-    #     plt.annotate(text='Basis: ' + basis, xy=(70, -0.37), ha='center', va='center',
-    #                  color='black', size=12)
-    #     plt.tight_layout()
-    #     plt.savefig(Path('outputs/figures/' + country + '.png'))
-    #     plt.close()
-    #
-    #     list_row = [country,
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_car'][0],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_car'][1],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_pt'][0],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_pt'][1],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_autocar'][0],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_autocar'][1],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_plane'][0],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_plane'][1],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_other'][0],
-    #                 dict_column_weighted_avg_and_std['trip_distance_by_other'][1], basis]
-    #     df_for_csv.loc[len(df_for_csv)] = list_row
-    # df_for_csv.to_csv(Path('outputs/tables/by_country.csv'), index=False, sep=',', encoding='iso-8859-1')
+    gdf_overnight_trips['destination_country_name'] = gdf_overnight_trips['destination_country'].map(code2country)
+    for NUTS1 in gdf_overnight_trips.NAME_LATN.unique():
+        print(NUTS1)
+        df_NUTS1 = gdf_overnight_trips.loc[gdf_overnight_trips['NAME_LATN'] == NUTS1, :]
+        dict_column_weighted_avg_and_std, \
+            sample = get_weighted_avg_and_std(df_NUTS1, weights='WP_corrected', percentage=True,
+                                              list_of_columns=['total_distance_by_plane_extrapolated',
+                                                               'total_distance_by_pt_extrapolated',
+                                                               'total_distance_by_car_extrapolated',
+                                                               'total_distance_by_autocar_extrapolated',
+                                                               'total_distance_by_other_extrapolated'])
+
+        df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
+                                           0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
+                                           0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
+                                           0] * 100]],
+                                     columns=[list_modes])
+        fig, ax = plt.subplots(figsize=(10, 4))
+        df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
+                                                                    '#E33B3B',  # by PT
+                                                                    'g',  # Autocar
+                                                                    'y',
+                                                                    '0.8'])
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
+                                           'öffentlicher Verkehr',
+                                           'Reisecar',
+                                           'Flugzeug',
+                                           'übrige'])
+        sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
+        ax.set_yticks([])
+        n = 0
+        if len(ax.patches) == 5:
+            for p in ax.patches:
+                h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
+                text = f'{w:0.0f}%'
+                if n == 4:
+                    text_color = 'black'
+                else:
+                    text_color = 'white'
+                ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
+                n = n + 1
+        plt.xlim([0, 100])
+        plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + NUTS1.split('/')[0] +
+                  ' (' + df_NUTS1['destination_country_name'].iloc[0] + ')')
+        basis = str(len(df_NUTS1))
+        plt.annotate(text='Basis: ' + basis, xy=(70, -0.37), ha='center', va='center',
+                     color='black', size=12)
+        plt.tight_layout()
+        plt.savefig(Path('data/outputs/figures/by_NUTS1/' + slugify(NUTS1.split('/')[0], allow_unicode=True) + '.png'))
+        plt.close()
+
+        list_row = [slugify(NUTS1, allow_unicode=True),
+                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
+        df_for_csv.loc[len(df_for_csv)] = list_row
+    df_for_csv.to_csv(Path('data/outputs/tables/by_NUTS1.csv'), index=False, sep=',', encoding='iso-8859-1')
 
 
 def get_modalsplit_by_country(df_overnight_trips):
@@ -275,26 +335,35 @@ def get_modalsplit_by_country(df_overnight_trips):
                     'TSCHECHISCHE REPUBLIK', 'SERBIEN', 'KROATIEN', 'SLOWENIEN', 'BOSNIEN UND HERZEGOWINA',
                     'MONTENEGRO', 'MAZEDONIEN', 'KOSOVO', 'RUSSLAND']:
         df_country = df_overnight_trips.loc[df_overnight_trips['destination_country_name'] == country, :]
-        dict_column_weighted_avg_and_std, sample = get_weighted_avg_and_std(df_country,
-                                                                            weights='WP', percentage=True,
-                                                                            list_of_columns=['trip_distance_by_plane',
-                                                                                             'trip_distance_by_pt',
-                                                                                             'trip_distance_by_car',
-                                                                                             'trip_distance_by_autocar',
-                                                                                             'trip_distance_by_other'])
+        dict_column_weighted_avg_and_std, \
+            sample = get_weighted_avg_and_std(df_country, weights='WP_corrected', percentage=True,
+                                              list_of_columns=['total_distance_by_plane_extrapolated',
+                                                               'total_distance_by_pt_extrapolated',
+                                                               'total_distance_by_car_extrapolated',
+                                                               'total_distance_by_autocar_extrapolated',
+                                                               'total_distance_by_other_extrapolated'])
 
-        df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['trip_distance_by_car'][0] * 100,
-                                       dict_column_weighted_avg_and_std['trip_distance_by_pt'][0] * 100,
-                                       dict_column_weighted_avg_and_std['trip_distance_by_autocar'][0] * 100,
-                                       dict_column_weighted_avg_and_std['trip_distance_by_plane'][0] * 100,
-                                       dict_column_weighted_avg_and_std['trip_distance_by_other'][0] * 100]],
+        df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
+                                           0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
+                                           0] * 100,
+                                       dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
+                                           0] * 100]],
                                      columns=[list_modes])
         fig, ax = plt.subplots(figsize=(10, 4))
         df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
-                                                                 '#E33B3B',  # by PT
-                                                                 'g',  # Autocar
-                                                                 'y',
-                                                                 '0.8'])
+                                                                    '#E33B3B',  # by PT
+                                                                    'g',  # Autocar
+                                                                    'y',
+                                                                    '0.8'])
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
+                                           'öffentlicher Verkehr',
+                                           'Reisecar',
+                                           'Flugzeug',
+                                           'übrige'])
         sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
         ax.set_yticks([])
         n = 0
@@ -314,26 +383,26 @@ def get_modalsplit_by_country(df_overnight_trips):
         plt.annotate(text='Basis: ' + basis, xy=(70, -0.37), ha='center', va='center',
                      color='black', size=12)
         plt.tight_layout()
-        plt.savefig(Path('outputs/figures/' + country + '.png'))
+        plt.savefig(Path('data/outputs/figures/by_country/' + country + '.png'))
         plt.close()
 
         list_row = [country,
-                    dict_column_weighted_avg_and_std['trip_distance_by_car'][0],
-                    dict_column_weighted_avg_and_std['trip_distance_by_car'][1],
-                    dict_column_weighted_avg_and_std['trip_distance_by_pt'][0],
-                    dict_column_weighted_avg_and_std['trip_distance_by_pt'][1],
-                    dict_column_weighted_avg_and_std['trip_distance_by_autocar'][0],
-                    dict_column_weighted_avg_and_std['trip_distance_by_autocar'][1],
-                    dict_column_weighted_avg_and_std['trip_distance_by_plane'][0],
-                    dict_column_weighted_avg_and_std['trip_distance_by_plane'][1],
-                    dict_column_weighted_avg_and_std['trip_distance_by_other'][0],
-                    dict_column_weighted_avg_and_std['trip_distance_by_other'][1], basis]
+                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
+                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
+                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
         df_for_csv.loc[len(df_for_csv)] = list_row
-    df_for_csv.to_csv(Path('outputs/tables/by_country.csv'), index=False, sep=',', encoding='iso-8859-1')
+    df_for_csv.to_csv(Path('data/outputs/tables/by_country.csv'), index=False, sep=',', encoding='iso-8859-1')
 
 
 def get_overnight_trips_in_2015_renamed():
-    selected_columns = ['HHNR', 'WP', 'RENR', 'reisenr', 'f70801', 'f71300', 'f71400_01', 'f71600b',
+    selected_columns = ['HHNR', 'WP', 'RENR', 'reisenr', 'f70801', 'f71300', 'f71400_01', 'f71600b', 'RZ_QAL',
                         'f70700_01', 'f71700b', 'RZ_LND', 'RZ_X', 'RZ_Y', 'RS_LND', 'RS1_LND', 'RS2_LND', 'RS3_LND']
     df_overnight_trips = get_overnight_trips(year=2015, selected_columns=selected_columns)
     # Rename variables
@@ -348,7 +417,8 @@ def get_overnight_trips_in_2015_renamed():
                                                             'RS1_LND': 'station1_country',
                                                             'RS2_LND': 'station2_country',
                                                             'RS3_LND': 'station3_country',
-                                                            'RENR': 'number_of_selected_trip'})
+                                                            'RENR': 'number_of_selected_trip',
+                                                            'RZ_QAL': 'quality_dest_coord'})
     return df_overnight_trips
 
 
@@ -360,6 +430,23 @@ def get_zp_renamed():
                                   'f70100': 'nb_trips_with_overnights',
                                   'alter': 'age'})
     return df_zp
+
+
+def slugify(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')
 
 
 if __name__ == '__main__':
