@@ -252,70 +252,75 @@ def get_modalsplit_by_nuts(df_overnight_trips):
     for NUTS1 in gdf_overnight_trips.NAME_LATN.unique():
         print(NUTS1)
         df_NUTS1 = gdf_overnight_trips.loc[gdf_overnight_trips['NAME_LATN'] == NUTS1, :]
-        dict_column_weighted_avg_and_std, \
-            sample = get_weighted_avg_and_std(df_NUTS1, weights='WP_corrected', percentage=True,
-                                              list_of_columns=['total_distance_by_plane_extrapolated',
-                                                               'total_distance_by_pt_extrapolated',
-                                                               'total_distance_by_car_extrapolated',
-                                                               'total_distance_by_autocar_extrapolated',
-                                                               'total_distance_by_other_extrapolated'])
+        basis = len(df_NUTS1)
+        if basis >= 10:
+            dict_column_weighted_avg_and_std, \
+                sample = get_weighted_avg_and_std(df_NUTS1, weights='WP_corrected', percentage=True,
+                                                  list_of_columns=['total_distance_by_plane_extrapolated',
+                                                                   'total_distance_by_pt_extrapolated',
+                                                                   'total_distance_by_car_extrapolated',
+                                                                   'total_distance_by_autocar_extrapolated',
+                                                                   'total_distance_by_other_extrapolated'])
 
-        df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
-                                           0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
-                                           0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
-                                           0] * 100]],
-                                     columns=[list_modes])
-        fig, ax = plt.subplots(figsize=(10, 4))
-        df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
-                                                                    '#E33B3B',  # by PT
-                                                                    'g',  # Autocar
-                                                                    'y',
-                                                                    '0.8'])
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
-                                           'öffentlicher Verkehr',
-                                           'Reisecar',
-                                           'Flugzeug',
-                                           'übrige'])
-        sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
-        ax.set_yticks([])
-        n = 0
-        if len(ax.patches) == 5:
-            for p in ax.patches:
-                h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
-                text = f'{w:0.0f}%'
-                if n == 4:
-                    text_color = 'black'
-                else:
-                    text_color = 'white'
-                ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
-                n = n + 1
-        plt.xlim([0, 100])
-        plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + NUTS1.split('/')[0] +
-                  ' (' + df_NUTS1['destination_country_name'].iloc[0] + ')')
-        basis = str(len(df_NUTS1))
-        plt.annotate(text='Basis: ' + basis, xy=(70, -0.37), ha='center', va='center',
-                     color='black', size=12)
-        plt.tight_layout()
-        plt.savefig(Path('data/outputs/figures/by_NUTS1/' + slugify(NUTS1.split('/')[0], allow_unicode=True) + '.png'))
-        plt.close()
+            df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
+                                               0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
+                                               0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
+                                               0] * 100]],
+                                         columns=[list_modes])
+            fig, ax = plt.subplots(figsize=(10, 4))
+            df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
+                                                                        '#E33B3B',  # by PT
+                                                                        'g',  # Autocar
+                                                                        'y',
+                                                                        '0.8'])
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
+                                               'öffentlicher Verkehr',
+                                               'Reisecar',
+                                               'Flugzeug',
+                                               'übrige'])
+            sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
+            ax.set_yticks([])
+            n = 0
+            if len(ax.patches) == 5:
+                for p in ax.patches:
+                    h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
+                    text = f'{w:0.0f}%'
+                    if n == 4:
+                        text_color = 'black'
+                    else:
+                        text_color = 'white'
+                    ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
+                    n = n + 1
+            plt.xlim([0, 100])
+            plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + NUTS1.split('/')[0] +
+                      ' (' + df_NUTS1['destination_country_name'].iloc[0] + ')')
+            plt.annotate(text='Basis: ' + str(basis), xy=(70, -0.37), ha='center', va='center',
+                         color='black', size=12)
+            plt.tight_layout()
+            if basis < 50:
+                name_NUTS1 = '(' + slugify(NUTS1) + ')'
+            else:
+                name_NUTS1 = slugify(NUTS1)
+            plt.savefig(Path('data/outputs/figures/by_NUTS1/' + name_NUTS1 + '.png'))
+            plt.close()
 
-        list_row = [slugify(NUTS1, allow_unicode=True),
-                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
-        df_for_csv.loc[len(df_for_csv)] = list_row
+            list_row = [name_NUTS1,
+                        dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
+            df_for_csv.loc[len(df_for_csv)] = list_row
     df_for_csv.to_csv(Path('data/outputs/tables/by_NUTS1.csv'), index=False, sep=',', encoding='iso-8859-1')
 
 
@@ -335,69 +340,74 @@ def get_modalsplit_by_country(df_overnight_trips):
                     'TSCHECHISCHE REPUBLIK', 'SERBIEN', 'KROATIEN', 'SLOWENIEN', 'BOSNIEN UND HERZEGOWINA',
                     'MONTENEGRO', 'MAZEDONIEN', 'KOSOVO', 'RUSSLAND']:
         df_country = df_overnight_trips.loc[df_overnight_trips['destination_country_name'] == country, :]
-        dict_column_weighted_avg_and_std, \
-            sample = get_weighted_avg_and_std(df_country, weights='WP_corrected', percentage=True,
-                                              list_of_columns=['total_distance_by_plane_extrapolated',
-                                                               'total_distance_by_pt_extrapolated',
-                                                               'total_distance_by_car_extrapolated',
-                                                               'total_distance_by_autocar_extrapolated',
-                                                               'total_distance_by_other_extrapolated'])
+        basis = len(df_country)
+        if basis >= 10:
+            dict_column_weighted_avg_and_std, \
+                sample = get_weighted_avg_and_std(df_country, weights='WP_corrected', percentage=True,
+                                                  list_of_columns=['total_distance_by_plane_extrapolated',
+                                                                   'total_distance_by_pt_extrapolated',
+                                                                   'total_distance_by_car_extrapolated',
+                                                                   'total_distance_by_autocar_extrapolated',
+                                                                   'total_distance_by_other_extrapolated'])
 
-        df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
-                                           0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
-                                           0] * 100,
-                                       dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
-                                           0] * 100]],
-                                     columns=[list_modes])
-        fig, ax = plt.subplots(figsize=(10, 4))
-        df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
-                                                                    '#E33B3B',  # by PT
-                                                                    'g',  # Autocar
-                                                                    'y',
-                                                                    '0.8'])
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
-                                           'öffentlicher Verkehr',
-                                           'Reisecar',
-                                           'Flugzeug',
-                                           'übrige'])
-        sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
-        ax.set_yticks([])
-        n = 0
-        if len(ax.patches) == 5:
-            for p in ax.patches:
-                h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
-                text = f'{w:0.0f}%'
-                if n == 4:
-                    text_color = 'black'
-                else:
-                    text_color = 'white'
-                ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
-                n = n + 1
-        plt.xlim([0, 100])
-        plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + country)
-        basis = str(len(df_country))
-        plt.annotate(text='Basis: ' + basis, xy=(70, -0.37), ha='center', va='center',
-                     color='black', size=12)
-        plt.tight_layout()
-        plt.savefig(Path('data/outputs/figures/by_country/' + country + '.png'))
-        plt.close()
+            df_for_figure = pd.DataFrame([[dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][
+                                               0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][
+                                               0] * 100,
+                                           dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][
+                                               0] * 100]],
+                                         columns=[list_modes])
+            fig, ax = plt.subplots(figsize=(10, 4))
+            df_for_figure.plot(kind='barh', stacked=True, ax=ax, color=['#000000',  # by car
+                                                                        '#E33B3B',  # by PT
+                                                                        'g',  # Autocar
+                                                                        'y',
+                                                                        '0.8'])
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles=handles, labels=['motorisierter Individualverkehr',
+                                               'öffentlicher Verkehr',
+                                               'Reisecar',
+                                               'Flugzeug',
+                                               'übrige'])
+            sns.move_legend(ax, bbox_to_anchor=(1.01, 1.02), loc='upper left')
+            ax.set_yticks([])
+            n = 0
+            if len(ax.patches) == 5:
+                for p in ax.patches:
+                    h, w, x, y = p.get_height(), p.get_width(), p.get_x(), p.get_y()
+                    text = f'{w:0.0f}%'
+                    if n == 4:
+                        text_color = 'black'
+                    else:
+                        text_color = 'white'
+                    ax.annotate(text=text, xy=(x + w / 2, y + h / 2), ha='center', va='center', color=text_color, size=16)
+                    n = n + 1
+            plt.xlim([0, 100])
+            plt.title('Verkehrsmittelwahl bei Reisen mit Übernachtungen: ' + country)
+            plt.annotate(text='Basis: ' + str(basis), xy=(70, -0.37), ha='center', va='center',
+                         color='black', size=12)
+            plt.tight_layout()
+            if basis < 50:
+                name_country = '(' + country + ')'
+            else:
+                name_country = country
+            plt.savefig(Path('data/outputs/figures/by_country/' + name_country + '.png'))
+            plt.close()
 
-        list_row = [country,
-                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
-                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
-                    dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
-        df_for_csv.loc[len(df_for_csv)] = list_row
+            list_row = [name_country,
+                        dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_car_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_pt_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_autocar_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_plane_extrapolated'][1],
+                        dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][0],
+                        dict_column_weighted_avg_and_std['total_distance_by_other_extrapolated'][1], basis]
+            df_for_csv.loc[len(df_for_csv)] = list_row
     df_for_csv.to_csv(Path('data/outputs/tables/by_country.csv'), index=False, sep=',', encoding='iso-8859-1')
 
 
